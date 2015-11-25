@@ -69,32 +69,48 @@ namespace SmartDapper.Repositories
 
         public void Add(T obj)
         {
-            //public string getSqlInsert()
-            //{
-            //    var columnsPart = string.Join(", ", _tableMap.PropertyMaps.Select(x => x.ColumnName));
-            //    var parametersPart = string.Join(", ", _tableMap.PropertyMaps.Where(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.None).Select(x => string.Format("@{0}", x.PropertyName)));
-            //    var result = string.Format("INSERT INTO {0}({1}) VALUES({2})", _tableMap.TableName, columnsPart, parametersPart);
-            //    if (_tableMap.PropertyMaps.Any(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity))
-            //        result = string.Format("{0}; SELECT SCOPE_IDENTITY()");
-            //    return result;
-            //}
-            throw new NotImplementedException();
+            var columnsPart = string.Join(", ", _tableMap.PropertyMaps
+                .Where(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.None)
+                .Select(x => x.ColumnName));
+
+            var paramsPart = string.Join(", ", _tableMap.PropertyMaps
+                .Where(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.None)
+                .Select(x => string.Format("@{0}", x.PropertyName)));
+
+            var sql = string.Format("INSERT INTO {0}({1}) VALUES({2})", _tableMap.TableName, columnsPart, paramsPart);
+
+            var identity = _tableMap.PropertyMaps.FirstOrDefault(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.Identity);
+            if(identity == null)
+            {
+                Connection.Execute(
+                    sql: sql,
+                    param: obj,
+                    transaction: Transaction
+                );
+            }
+            else
+            {
+                sql = string.Format("{0}; SELECT SCOPE_IDENTITY()", sql);
+                var key = Connection.ExecuteScalar(
+                    sql: sql,
+                    param: obj,
+                    transaction: Transaction
+                );
+                var prop = typeof(T).GetProperty(identity.PropertyName);
+                if(prop != null)
+                    prop.SetValue(obj, key);
+            }
         }
 
         public void Update(T obj)
         {
-            //public string getSqlUpdate()
-            //{
-            //    var setsPart = string.Join(" AND ", _tableMap.PropertyMaps.Where(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.None).Select(x => string.Format("{0} = @{1}", x.ColumnName, x.PropertyName)));
-            //    var constraintsPart = string.Join(" AND ", _tableMap.PropertyMaps.Where(x => x.KeyOrder.HasValue).OrderBy(x => x.KeyOrder.Value).Select(x => string.Format("{0} = @{1}", x.ColumnName, x.PropertyName)));
-            //    return string.Format("UPDATE {0} SET {1} WHERE {2}", _tableMap.TableName, setsPart, constraintsPart);
-            //}
-            throw new NotImplementedException();
-        }
-
-        public void Delete(T obj)
-        {
-            throw new NotImplementedException();
+            var setsPart = string.Join(" AND ", _tableMap.PropertyMaps.Where(x => x.DatabaseGeneratedOption == DatabaseGeneratedOption.None).Select(x => string.Format("{0} = @{1}", x.ColumnName, x.PropertyName)));
+            var sql = string.Format("UPDATE {0} SET {1} WHERE {2}", _tableMap.TableName, setsPart, _sqlKeyConstraint);
+            Connection.Execute(
+                sql: sql,
+                param: obj,
+                transaction: Transaction
+            );
         }
 
         public void Delete(object key)

@@ -12,7 +12,6 @@ namespace SmartDapper.Repositories
         T Find(object key);
         void Add(T obj);
         void Update(T obj);
-        void Delete(T obj);
         void Delete(object key);
     }
 }
